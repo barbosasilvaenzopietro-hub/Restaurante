@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Brasa & Cia — Cardápio</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+
+<div id="app">
+
+  <!-- LOCKDOWN -->
+  <div class="lockdown-overlay" id="lockdown">
+    <div style="font-size:64px;margin-bottom:20px">🔒</div>
+    <p class="lock-title">Sistema Bloqueado</p>
+    <p class="lock-sub">O aplicativo foi temporariamente suspenso pelo administrador.</p>
+    <div class="lock-code" id="lock-msg">SISTEMA OFFLINE</div>
+    <p style="font-size:11px;color:#3a0020;margin-top:12px">Tente novamente mais tarde.</p>
+  </div>
+
+  <!-- TOAST -->
+  <div class="toast" id="toast"><span id="ti">🔔</span><span id="tm"></span></div>
+
+  <!-- MODAL CONFIRM -->
+  <div class="moverlay" id="m-confirm">
+    <div class="confirm-modal">
+      <div class="cm-icon" id="cm-icon">⚠️</div>
+      <p class="cm-title" id="cm-title">Confirmar ação</p>
+      <p class="cm-sub" id="cm-sub">Tem certeza?</p>
+      <div class="cm-actions">
+        <button class="cm-cancel" onclick="closeM('m-confirm')">Cancelar</button>
+        <button class="cm-confirm" id="cm-btn" onclick="execConfirm()">Confirmar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL ITEM EDITOR -->
+  <div class="moverlay" id="m-item">
+    <div class="modal">
+      <p class="mtit" id="mi-tit">Novo item</p>
+      <label class="lbl">Emoji</label>
+      <input class="inp" id="mi-e" placeholder="🍔" style="margin-bottom:7px">
+      <label class="lbl">Nome</label>
+      <input class="inp" id="mi-n" placeholder="Nome do prato" style="margin-bottom:7px">
+      <label class="lbl">Descrição</label>
+      <input class="inp" id="mi-d" placeholder="Breve descrição" style="margin-bottom:7px">
+      <div class="inp-row">
+        <div>
+          <label class="lbl">Preço base (R$)</label>
+          <input class="inp" id="mi-p" type="number" step="0.01" placeholder="0.00">
+        </div>
+        <div>
+          <label class="lbl">Categoria</label>
+          <select class="inp" id="mi-c">
+            <option>Pratos Principais</option>
+            <option>Entradas</option>
+            <option>Bebidas</option>
+            <option>Sobremesas</option>
+          </select>
+        </div>
+      </div>
+      <label class="lbl">Tamanhos (ex: P,M,G — separados por vírgula)</label>
+      <input class="inp" id="mi-s" placeholder="Deixe vazio se não tiver" style="margin-bottom:7px">
+      <label class="lbl" style="margin-bottom:8px">Adicionais (nome + preço)</label>
+      <div id="addon-editor"></div>
+      <button class="addon-add-btn" onclick="addAddonRow()">+ Novo adicional</button>
+      <div class="mact">
+        <button class="bcancel" onclick="closeM('m-item')">Cancelar</button>
+        <button class="bsave" onclick="saveItem()">Salvar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL TABLE -->
+  <div class="moverlay" id="m-table">
+    <div class="modal">
+      <p class="mtit" id="mt-tit">Mesa</p>
+      <div id="mt-body"></div>
+      <div class="mact">
+        <button class="bcancel" onclick="closeM('m-table')">Fechar</button>
+        <button class="bsave" id="mt-act">Liberar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL ADD TABLE -->
+  <div class="moverlay" id="m-addtable">
+    <div class="modal">
+      <p class="mtit">Adicionar Mesa</p>
+      <label class="lbl">Localização</label>
+      <select class="inp" id="at-loc" style="margin-bottom:7px">
+        <option value="inside">Parte interna</option>
+        <option value="outside">Parte externa</option>
+      </select>
+      <label class="lbl">Capacidade (lugares)</label>
+      <input class="inp" id="at-cap" type="number" min="1" max="30" placeholder="Ex: 4">
+      <div class="mact">
+        <button class="bcancel" onclick="closeM('m-addtable')">Cancelar</button>
+        <button class="bsave" onclick="addTable()">Adicionar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======= SCREEN: MENU ======= -->
+  <div id="sm" class="screen active">
+    <div class="hdr">
+      <div class="logo">brasa<span>&</span>cia</div>
+      <div style="display:flex;gap:6px">
+        <button class="bicon" id="ubtn" onclick="handleUser()">
+          <span>👤</span><span id="ulbl">Entrar</span>
+        </button>
+        <button class="bicon" onclick="goAdmin()">🔐</button>
+        <button class="bicon" id="cbtn" style="display:none" onclick="showS('sc')">
+          🛒 <span class="nc" id="ccnt">0</span>
+        </button>
+      </div>
+    </div>
+    <div class="hero">
+      <div class="hero-tag">🔥 Cardápio Digital</div>
+      <h1>O melhor da brasa<br>pra você!</h1>
+      <p>Peça com facilidade, direto do cardápio</p>
+      <div class="hstats">
+        <div class="hstat"><span class="sdot"></span> Aberto agora</div>
+        <div class="hstat">⏱ ~30 min</div>
+        <div class="hstat">⭐ 4.9</div>
+      </div>
+    </div>
+    <div class="catbar" id="catbar"></div>
+    <div class="sbody" id="mbody"></div>
+    <div class="cartbar hidden" id="cartbar">
+      <div class="cinfo">
+        <span id="cbc">0 itens</span>
+        <strong id="cbt">R$ 0,00</strong>
+      </div>
+      <button class="bcheck" onclick="showS('sc')">Ver carrinho →</button>
+    </div>
+  </div>
+
+  <!-- ======= SCREEN: REGISTER ======= -->
+  <div id="s-reg" class="screen">
+    <div class="hdr">
+      <button class="bback" onclick="showS('sm')">←</button>
+      <div class="logo" style="font-size:17px">Cadastro</div>
+      <div></div>
+    </div>
+    <div class="center-wrap">
+      <div class="acard">
+        <div class="aicon">👤</div>
+        <p class="atit">Criar conta</p>
+        <p class="asub">Para pedir, cadastre-se primeiro.</p>
+        <p class="err" id="re-err"></p>
+        <label class="lbl">Nome completo</label>
+        <input class="inp" id="rn" placeholder="Seu nome" style="margin-bottom:7px">
+        <label class="lbl">Celular (WhatsApp com DDD)</label>
+        <input class="inp" id="rph" placeholder="(35) 99999-9999" type="tel" style="margin-bottom:7px">
+        <label class="lbl">Senha</label>
+        <input class="inp" id="rpw" type="password" placeholder="Mínimo 4 dígitos">
+        <button class="bprimary" onclick="doRegister()">Cadastrar e verificar</button>
+        <button class="bsec" onclick="showS('s-login')">Já tenho conta</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======= SCREEN: LOGIN ======= -->
+  <div id="s-login" class="screen">
+    <div class="hdr">
+      <button class="bback" onclick="showS('sm')">←</button>
+      <div class="logo" style="font-size:17px">Entrar</div>
+      <div></div>
+    </div>
+    <div class="center-wrap">
+      <div class="acard">
+        <div class="aicon">🔑</div>
+        <p class="atit">Bem-vindo de volta</p>
+        <p class="asub">Entre com seus dados para pedir.</p>
+        <p class="err" id="li-err"></p>
+        <label class="lbl">Celular</label>
+        <input class="inp" id="lph" placeholder="(35) 99999-9999" type="tel" style="margin-bottom:7px">
+        <label class="lbl">Senha</label>
+        <input class="inp" id="lpw" type="password" placeholder="Sua senha">
+        <button class="bprimary" onclick="doLogin()">Entrar</button>
+        <button class="bsec" onclick="showS('s-reg')">Criar conta</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======= SCREEN: VERIFY ======= -->
+  <div id="s-verify" class="screen">
+    <div class="hdr">
+      <button class="bback" onclick="showS('s-reg')">←</button>
+      <div class="logo" style="font-size:17px">Verificação</div>
+      <div></div>
+    </div>
+    <div class="center-wrap">
+      <div class="acard" style="text-align:center">
+        <div style="font-size:38px;margin-bottom:9px">📱</div>
+        <p class="atit">Verifique seu número</p>
+        <p class="asub" style="margin-bottom:14px">
+          Você deve ter recebido o código via WhatsApp.<br>
+          <strong id="vph" style="color:var(--text)"></strong>
+        </p>
+        <div class="otprow">
+          <input class="otpinp" id="o0" maxlength="1" oninput="om(0)">
+          <input class="otpinp" id="o1" maxlength="1" oninput="om(1)">
+          <input class="otpinp" id="o2" maxlength="1" oninput="om(2)">
+          <input class="otpinp" id="o3" maxlength="1" oninput="om(3)">
+        </div>
+        <p class="err" id="otp-err" style="text-align:center"></p>
+        <button class="bprimary" onclick="confirmOTP()">Verificar</button>
+        <p style="font-size:11px;color:var(--text3);margin-top:10px">
+          Não recebeu? Peça para o atendente reenviar.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======= SCREEN: CART ======= -->
+  <div id="sc" class="screen">
+    <div class="hdr">
+      <button class="bback" onclick="showS('sm')">←</button>
+      <div class="logo" style="font-size:17px">Meu Pedido</div>
+      <div></div>
+    </div>
+    <div class="sbody">
+      <div id="citems"></div>
+      <div class="scard">
+        <p class="sctitle">Tipo de pedido</p>
+        <div class="otgrid">
+          <div class="otbtn active" id="ot-delivery" onclick="setOT('delivery')">🛵<br>Entrega</div>
+          <div class="otbtn" id="ot-pickup" onclick="setOT('pickup')">🏃<br>Retirada</div>
+          <div class="otbtn" id="ot-reserve" onclick="setOT('reserve')">🪑<br>Reserva</div>
+        </div>
+        <div id="f-delivery">
+          <label class="lbl">Rua e número</label>
+          <input class="inp" id="a1" placeholder="Ex: Rua das Flores, 123" style="margin-bottom:6px">
+          <label class="lbl">Complemento</label>
+          <input class="inp" id="a2" placeholder="Apto, bloco..." style="margin-bottom:6px">
+          <label class="lbl">Bairro</label>
+          <input class="inp" id="a3" placeholder="Bairro">
+        </div>
+        <div id="f-pickup" style="display:none">
+          <p style="font-size:12px;color:var(--text2);margin-top:5px">Retire no balcão. Avisamos pelo WhatsApp quando ficar pronto.</p>
+        </div>
+        <div id="f-reserve" style="display:none">
+          <label class="lbl">Localização</label>
+          <div class="loctabs">
+            <div class="ltab active" id="loc-i" onclick="setLoc('inside')">🏠 Interna</div>
+            <div class="ltab" id="loc-o" onclick="setLoc('outside')">🌿 Externa</div>
+          </div>
+          <label class="lbl">Mesa disponível</label>
+          <div id="tchips" style="margin-top:5px"></div>
+          <label class="lbl">Data e hora</label>
+          <input class="inp" id="rdt" type="datetime-local" style="margin-bottom:6px">
+          <label class="lbl">Número de pessoas</label>
+          <input class="inp" id="rppl" type="number" min="1" placeholder="Ex: 2">
+        </div>
+      </div>
+      <div class="scard">
+        <p class="sctitle">Pagamento</p>
+        <div class="payopts">
+          <div class="paybtn active" id="py-dinheiro" onclick="setPay('dinheiro')">💵 Dinheiro</div>
+          <div class="paybtn" id="py-pix" onclick="setPay('pix')">📷 Pix</div>
+          <div class="paybtn" id="py-debito" onclick="setPay('debito')">💳 Débito</div>
+          <div class="paybtn" id="py-credito" onclick="setPay('credito')">💳 Crédito</div>
+        </div>
+        <div id="trocof">
+          <label class="lbl">Precisa de troco?</label>
+          <div style="display:flex;gap:8px;margin-top:5px">
+            <div class="paybtn" id="tr-s" onclick="setTroco(true)" style="flex:1">✔ Sim</div>
+            <div class="paybtn active" id="tr-n" onclick="setTroco(false)" style="flex:1">✖ Não</div>
+          </div>
+          <div id="trv" style="display:none;margin-top:7px">
+            <label class="lbl">Troco para quanto?</label>
+            <input class="inp" id="trvv" type="number" placeholder="Ex: 50">
+          </div>
+        </div>
+      </div>
+      <div class="scard">
+        <p class="sctitle">Observações</p>
+        <textarea class="inp" id="obs" placeholder="Sem cebola, ponto da carne..." style="height:60px;resize:none"></textarea>
+      </div>
+      <div class="sumcard" id="csum"></div>
+      <button class="bprimary" onclick="confirmOrder()">Confirmar Pedido</button>
+    </div>
+  </div>
+
+  <!-- ======= SCREEN: SUCCESS ======= -->
+  <div id="ss" class="screen" style="align-items:center;justify-content:center;text-align:center;padding:36px 18px">
+    <div style="font-size:58px;margin-bottom:12px">🎉</div>
+    <p style="font-family:'Syne',sans-serif;font-size:21px;font-weight:800;margin-bottom:6px">Pedido confirmado!</p>
+    <p style="color:var(--text2);font-size:13px;margin-bottom:20px;line-height:1.6">Enviado ao restaurante!<br>Você receberá atualizações pelo WhatsApp.</p>
+    <div style="background:var(--bg2);border:.5px solid var(--border2);border-radius:var(--r);padding:13px 19px;margin-bottom:18px;font-size:12px;color:var(--text2)">
+      Número do pedido<strong id="snum" style="font-family:'Syne',sans-serif;font-size:19px;color:var(--accent);display:block;margin-top:3px">#101</strong>
+    </div>
+    <button class="bprimary" style="max-width:210px" onclick="showS('sm')">Voltar ao cardápio</button>
+  </div>
+
+  <!-- ======= SCREEN: ADMIN LOGIN ======= -->
+  <div id="s-adm-login" class="screen">
+    <div class="hdr">
+      <button class="bback" onclick="showS('sm')">←</button>
+      <div class="logo" style="font-size:17px">Admin</div>
+      <div></div>
+    </div>
+    <div class="center-wrap">
+      <div class="acard">
+        <div class="aicon">🔐</div>
+        <p class="atit">Painel do dono</p>
+        <p class="asub" style="margin-bottom:13px">Digite a senha de acesso.</p>
+        <p class="err" id="adm-err"></p>
+        <label class="lbl">Senha</label>
+        <input class="inp" id="adm-pw" type="password" placeholder="Senha de admin" style="margin-bottom:4px">
+        <button class="bprimary" onclick="doAdmLogin()">Entrar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======= SCREEN: ADMIN PANEL ======= -->
+  <div id="s-adm" class="screen">
+    <div class="hdr">
+      <div class="logo" style="font-size:17px">Painel Admin</div>
+      <button class="bicon" onclick="showS('sm')">🚪 Sair</button>
+    </div>
+    <div class="anav">
+      <button class="anb active" id="at-pedidos" onclick="admTab('pedidos')">🔔 Pedidos <span class="nc" id="pnc" style="display:none">0</span></button>
+      <button class="anb" id="at-mesas" onclick="admTab('mesas')">🪑 Mesas</button>
+      <button class="anb" id="at-cardapio" onclick="admTab('cardapio')">🍽 Cardápio</button>
+      <button class="anb" id="at-clientes" onclick="admTab('clientes')">👥 Clientes</button>
+      <button class="anb" id="at-config" onclick="admTab('config')">⚙️ Config</button>
+    </div>
+    <div class="sbody" id="admbody" style="padding-bottom:20px"></div>
+  </div>
+
+  <!-- ======= SCREEN: SUPER ADMIN ======= -->
+  <div id="s-sadm" class="screen">
+    <div class="sa-hdr">
+      <div class="sa-logo">🛡 Super Admin</div>
+      <button class="sa-exit" onclick="showS('sm')">🚪 Sair</button>
+    </div>
+    <div class="sa-nav">
+      <button class="sanb active" id="sat-visao" onclick="saTab('visao')">📊 Visão geral</button>
+      <button class="sanb" id="sat-usuarios" onclick="saTab('usuarios')">👥 Usuários</button>
+      <button class="sanb" id="sat-sistema" onclick="saTab('sistema')">🛡 Sistema</button>
+    </div>
+    <div class="sbody" id="sadmbody" style="padding-bottom:20px;background:#080005"></div>
+  </div>
+
+</div>
+
+<script src="supabase-config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
